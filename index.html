@@ -68,7 +68,7 @@
     const SUPABASE_URL = 'https://bzlbnxeckajknojuqhhn.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6bGJueGVja2Fqa25vanVxaGhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NjkxNDYsImV4cCI6MjA5MTI0NTE0Nn0.gpmkxLBMcTHOHYmnsnmZV5ZV_lY5m4IPMU4svkpIL7M';
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // UUID 관리 (기기 식별용 — localStorage에 저장)
     const UUID_KEY = 'tourSessionId';
@@ -89,7 +89,7 @@
         window.history.replaceState({}, document.title, window.location.pathname);
 
         // 서버에서 현재 세션 불러오기
-        const { data } = await supabase
+        const { data } = await db
             .from('sessions')
             .select('*')
             .eq('id', sessionId)
@@ -98,7 +98,7 @@
         if (data) {
             tourState = data;
         } else {
-            await supabase.from('sessions').insert({ id: sessionId });
+            await db.from('sessions').insert({ id: sessionId });
         }
 
         // 스팟 방문 처리
@@ -106,7 +106,7 @@
             const spotKey = `spot${currentSpot}`;
             if (!tourState[spotKey]) {
                 tourState[spotKey] = true;
-                await supabase
+                await db
                     .from('sessions')
                     .update({ [spotKey]: true })
                     .eq('id', sessionId);
@@ -182,7 +182,7 @@
         document.getElementById('phone-overlay').classList.add('loading');
         errorEl.textContent = '';
 
-        const { data: existing } = await supabase
+        const { data: existing } = await db
             .from('sessions')
             .select('id')
             .eq('phone', phone)
@@ -210,7 +210,7 @@
 
         document.getElementById('reward-overlay').classList.add('loading');
 
-        await supabase
+        await db
             .from('sessions')
             .update({
                 is_rewarded: true,
