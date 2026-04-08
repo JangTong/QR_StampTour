@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>진안 꽃잔디 스탬프 투어</title>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; text-align: center; background-color: #fcf4f6; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { font-size: 24px; color: #d6336c; margin-bottom: 5px; }
+        p.subtitle { font-size: 14px; color: #666; margin-bottom: 30px; }
+        .visual-area { font-size: 80px; margin: 20px 0; min-height: 120px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+        .status-text { font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #d6336c; }
+        .spot-list { list-style: none; padding: 0; margin: 0 0 30px 0; text-align: left; }
+        .spot-item { padding: 12px 16px; margin-bottom: 8px; border-radius: 8px; background-color: #f1f3f5; color: #adb5bd; font-weight: bold; display: flex; justify-content: space-between; }
+        .spot-item.active { background-color: #ffe3e3; color: #d6336c; }
+        .btn { display: block; width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 10px; box-sizing: border-box; }
+        .btn-reward { background-color: #d6336c; color: white; display: none; }
+        .btn-reset { background-color: #e9ecef; color: #495057; }
+        .reward-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; box-sizing: border-box; }
+        .reward-overlay h2 { color: #ff8787; margin-bottom: 20px; }
+        .phone-input { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #d6336c; margin: 10px 0; box-sizing: border-box; text-align: center; }
+        .loading { opacity: 0.6; pointer-events: none; }
+        .error-msg { color: #ff6b6b; font-size: 14px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>꽃잔디 동산 탐험</h1>
+    <p class="subtitle">4곳의 스팟을 찾아 꽃을 피워주세요!</p>
+
+    <div class="visual-area" id="visual-emoji">🪹</div>
+    <div class="status-text" id="status-text">씨앗을 심을 준비가 되었습니다.</div>
+
+    <ul class="spot-list">
+        <li class="spot-item" id="ui-spot1"><span>📍 1번 스팟: 입구 광장</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot2"><span>📍 2번 스팟: 소원 바위</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot3"><span>📍 3번 스팟: 바람의 언덕</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot4"><span>📍 4번 스팟: 정상 전망대</span><span class="check"></span></li>
+    </ul>
+
+    <button class="btn btn-reward" id="btn-reward" onclick="showRewardForm()">🎁 리워드 수령하기</button>
+</div>
+
+<!-- 전화번호 입력 오버레이 -->
+<div class="reward-overlay" id="phone-overlay">
+    <h2>🎁 리워드 수령</h2>
+    <p>중복 수령 방지를 위해<br>전화번호를 입력해주세요.</p>
+    <input class="phone-input" id="phone-input" type="tel" placeholder="010-0000-0000" maxlength="13">
+    <div class="error-msg" id="phone-error"></div>
+    <button class="btn btn-reward" style="display:block; width:80%; margin-top:10px;" onclick="submitPhone()">확인</button>
+    <button class="btn btn-reset" style="width:80%; margin-top:10px;" onclick="closePhoneOverlay()">취소</button>
+</div>
+
+<!-- 직원 확인 오버레이 -->
+<div class="reward-overlay" id="reward-overlay">
+    <h2>🎉 투어 완료! 🎉</h2>
+    <p>직원에게 이 화면을 보여주세요.</p>
+    <p style="font-size:12px; opacity:0.7;" id="reward-phone-display"></p>
+    <button class="btn" style="width:80%; background-color:white; color:black; margin-top:30px;" onclick="completeReward()">[직원 전용] 사용 완료 처리</button>
+</div>
+
+<!-- Supabase 클라이언트 라이브러리 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    const SUPABASE_URL = 'https://bzlbnxeckajknojuqhhn.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6bGJueGVja2Fqa25vanVxaGhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NjkxNDYsImV4cCI6MjA5MTI0NTE0Nn0.gpmkxLBMcTHOHYmnsnmZV5ZV_lY5m4IPMU4svkpIL7M';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // UUID 관리 (기기 식별용 — localStorage에 저장)
+    const UUID_KEY = 'tourSessionId';
+    let sessionId = localStorage.getItem(UUID_KEY);
+    if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem(UUID_KEY, sessionId);
+    }
+
+    let tourState = { spot1: false, spot2: false, spot3: false, spot4: false, is_rewarded: false };
+    let pendingPhone = '';
+
+    // 앱 초기화
+    async function init() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSpot = parseInt(urlParams.get('spot'));
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // 서버에서 현재 세션 불러오기
+        const { data } = await supabase
+            .from('sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+
+        if (data) {
+            tourState = data;
+        } else {
+            await supabase.from('sessions').insert({ id: sessionId });
+        }
+
+        // 스팟 방문 처리
+        if (currentSpot >= 1 && currentSpot <= 4 && !tourState.is_rewarded) {
+            const spotKey = `spot${currentSpot}`;
+            if (!tourState[spotKey]) {
+                tourState[spotKey] = true;
+                await supabase
+                    .from('sessions')
+                    .update({ [spotKey]: true })
+                    .eq('id', sessionId);
+            }
+        }
+
+        renderUI();
+    }
+
+    // UI 렌더링
+    function renderUI() {
+        let count = 0;
+        for (let i = 1; i <= 4; i++) {
+            const el = document.getElementById(`ui-spot${i}`);
+            if (tourState[`spot${i}`]) {
+                el.classList.add('active');
+                el.querySelector('.check').textContent = '🌸';
+                count++;
+            }
+        }
+
+        const visual = document.getElementById('visual-emoji');
+        const statusText = document.getElementById('status-text');
+        const rewardBtn = document.getElementById('btn-reward');
+
+        const stages = [
+            { emoji: '🪹', text: '빈 화분입니다. 스팟을 찾아주세요!' },
+            { emoji: '🌱', text: '씨앗에서 새싹이 돋았습니다!' },
+            { emoji: '🌿', text: '줄기가 튼튼하게 자라고 있습니다.' },
+            { emoji: '🌷', text: '예쁜 꽃봉오리가 맺혔습니다!' },
+            { emoji: '🌸✨', text: '축하합니다! 꽃잔디가 만개했습니다!' },
+        ];
+
+        visual.textContent = stages[count].emoji;
+        statusText.textContent = stages[count].text;
+
+        if (count === 4) {
+            if (!tourState.is_rewarded) {
+                rewardBtn.style.display = 'block';
+            } else {
+                rewardBtn.style.display = 'none';
+                statusText.textContent = '이미 리워드를 수령한 완료 티켓입니다.';
+                visual.style.opacity = '0.5';
+            }
+        } else {
+            rewardBtn.style.display = 'none';
+        }
+    }
+
+    // 리워드 수령 — 전화번호 입력창 열기
+    function showRewardForm() {
+        document.getElementById('phone-overlay').style.display = 'flex';
+        document.getElementById('phone-input').focus();
+    }
+
+    function closePhoneOverlay() {
+        document.getElementById('phone-overlay').style.display = 'none';
+        document.getElementById('phone-error').textContent = '';
+        document.getElementById('phone-input').value = '';
+    }
+
+    // 전화번호 제출 및 중복 확인
+    async function submitPhone() {
+        const rawPhone = document.getElementById('phone-input').value.trim();
+        const phone = rawPhone.replace(/-/g, '');
+        const errorEl = document.getElementById('phone-error');
+
+        if (!/^010\d{8}$/.test(phone)) {
+            errorEl.textContent = '올바른 전화번호를 입력해주세요. (예: 010-1234-5678)';
+            return;
+        }
+
+        document.getElementById('phone-overlay').classList.add('loading');
+        errorEl.textContent = '';
+
+        const { data: existing } = await supabase
+            .from('sessions')
+            .select('id')
+            .eq('phone', phone)
+            .eq('is_rewarded', true)
+            .single();
+
+        document.getElementById('phone-overlay').classList.remove('loading');
+
+        if (existing) {
+            errorEl.textContent = '이미 해당 전화번호로 리워드를 수령하셨습니다.';
+            return;
+        }
+
+        pendingPhone = phone;
+        closePhoneOverlay();
+
+        const displayPhone = phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+        document.getElementById('reward-phone-display').textContent = `전화번호: ${displayPhone}`;
+        document.getElementById('reward-overlay').style.display = 'flex';
+    }
+
+    // 직원이 사용 완료 처리
+    async function completeReward() {
+        if (!confirm('직원 전용 버튼입니다. 사용 완료 처리하시겠습니까?')) return;
+
+        document.getElementById('reward-overlay').classList.add('loading');
+
+        await supabase
+            .from('sessions')
+            .update({
+                is_rewarded: true,
+                phone: pendingPhone,
+                rewarded_at: new Date().toISOString()
+            })
+            .eq('id', sessionId);
+
+        tourState.is_rewarded = true;
+        document.getElementById('reward-overlay').style.display = 'none';
+        renderUI();
+    }
+
+    // 실행
+    init();
+</script>
+
+</body>
+</html>
