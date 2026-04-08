@@ -22,6 +22,21 @@
         .phone-input { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #d6336c; margin: 10px 0; box-sizing: border-box; text-align: center; }
         .loading { opacity: 0.6; pointer-events: none; }
         .error-msg { color: #ff6b6b; font-size: 14px; margin: 5px 0; }
+        .spot-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 30px; box-sizing: border-box; }
+        .spot-overlay .spot-card { background: white; color: #333; border-radius: 20px; padding: 32px 24px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .spot-overlay .spot-emoji { font-size: 52px; margin-bottom: 12px; }
+        .spot-overlay .spot-name { font-size: 13px; color: #d6336c; font-weight: bold; letter-spacing: 1px; margin-bottom: 6px; }
+        .spot-overlay .spot-title { font-size: 20px; font-weight: bold; color: #222; margin-bottom: 16px; }
+        .spot-overlay .spot-desc { font-size: 15px; color: #555; line-height: 1.7; margin-bottom: 16px; }
+        .spot-overlay .btn-close { background-color: #d6336c; color: white; border: none; border-radius: 10px; padding: 14px 0; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .mission-box { background: #fff5f7; border: 1.5px solid #fcc2d7; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; text-align: left; }
+        .mission-label { font-size: 12px; font-weight: bold; color: #d6336c; margin-bottom: 6px; }
+        .mission-text { font-size: 14px; color: #444; line-height: 1.75; white-space: pre-line; }
+        .quiz-question { font-size: 16px; font-weight: bold; color: #222; margin: 12px 0 14px; }
+        .quiz-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .quiz-options button { padding: 12px 14px; border: 2px solid #f1f3f5; border-radius: 10px; background: white; font-size: 14px; font-weight: bold; cursor: pointer; color: #333; text-align: left; transition: all 0.2s; }
+        .quiz-options button.wrong { border-color: #ff6b6b; background: #fff5f5; color: #ff6b6b; }
+        .quiz-options button.correct { border-color: #51cf66; background: #f0fff4; color: #2f9e44; }
     </style>
 </head>
 <body>
@@ -34,13 +49,40 @@
     <div class="status-text" id="status-text">씨앗을 심을 준비가 되었습니다.</div>
 
     <ul class="spot-list">
-        <li class="spot-item" id="ui-spot1"><span>📍 1번 스팟: 입구 광장</span><span class="check"></span></li>
-        <li class="spot-item" id="ui-spot2"><span>📍 2번 스팟: 소원 바위</span><span class="check"></span></li>
-        <li class="spot-item" id="ui-spot3"><span>📍 3번 스팟: 바람의 언덕</span><span class="check"></span></li>
-        <li class="spot-item" id="ui-spot4"><span>📍 4번 스팟: 정상 전망대</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot1"><span>📍 동산정상 : 첫번째 꽃잔디정</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot2"><span>📍 꽃잔디 고원길 : 두번째 분홍빛 속삭임</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot3"><span>📍 바람전망대 : 세번째 바람도 쉬는 곳</span><span class="check"></span></li>
+        <li class="spot-item" id="ui-spot4"><span>📍 카페 효산재 : 마지막 동산의 작은 쉼터</span><span class="check"></span></li>
     </ul>
 
     <button class="btn btn-reward" id="btn-reward" onclick="showRewardForm()">🎁 리워드 수령하기</button>
+</div>
+
+<!-- 스팟 방문 환영 오버레이 -->
+<div class="spot-overlay" id="spot-overlay">
+    <div class="spot-card">
+        <div class="spot-emoji" id="spot-overlay-emoji"></div>
+        <div class="spot-name" id="spot-overlay-name"></div>
+        <div class="spot-title" id="spot-overlay-title"></div>
+        <div class="spot-desc" id="spot-overlay-desc"></div>
+        <div class="mission-box" id="spot-mission-box" style="display:none;">
+            <div class="mission-label">🎯 미션</div>
+            <div class="mission-text" id="spot-mission-text"></div>
+        </div>
+        <button class="btn-close" onclick="closeSpotOverlay()">확인</button>
+    </div>
+</div>
+
+<!-- 퀴즈 오버레이 (스팟 1) -->
+<div class="spot-overlay" id="quiz-overlay">
+    <div class="spot-card">
+        <div class="spot-emoji">🏔️</div>
+        <div class="spot-name">동산정상 미션</div>
+        <div class="spot-title" style="color:#d6336c;">퀴즈를 맞춰야 스탬프!</div>
+        <div class="quiz-question">꽃구경 온 이곳의 이름은?</div>
+        <div class="quiz-options" id="quiz-options"></div>
+        <div id="quiz-feedback" style="font-size:14px; min-height:20px; font-weight:bold;"></div>
+    </div>
 </div>
 
 <!-- 전화번호 입력 오버레이 -->
@@ -78,6 +120,15 @@
         localStorage.setItem(UUID_KEY, sessionId);
     }
 
+    const SPOT_INFO = {
+        1: { emoji: '🏔️', name: '동산정상', title: '첫번째 꽃잔디정', desc: '꽃잔디동산에서 제일 높은 곳에 오셨습니다. 마이산과 그 산세를 관망할 수 있습니다.', missionText: null },
+        2: { emoji: '🌸', name: '꽃잔디 고원길', title: '두번째 분홍빛 속삭임', desc: '꽃향기만 남는 곳, 꽃잔디고원길 입니다.', missionText: '분홍빛 드레스코드로 꽃잔디 앞에서 특별한 포즈를 취하고 사진을 찍어주세요! 📸\n직원이 확인 후 스탬프를 인정해드립니다.' },
+        3: { emoji: '🌬️', name: '바람전망대', title: '세번째 바람도 쉬는 곳', desc: '바람이 전하는 안부, \'오늘 여기 오길 잘했지?\'', missionText: '잠깐 멈춰, 꽃동산의 바람을 깊게 들이마셔 보세요. 🌬️\n눈을 감고 자연의 향기를 느껴보세요.' },
+        4: { emoji: '☕', name: '카페 효산재', title: '마지막 동산의 작은 쉼터', desc: '기분좋은 마침표, 우리들의 이야기로 채워가는 작은 카페입니다.', missionText: null },
+    };
+
+    let pendingSpot = 0;
+
     let tourState = { spot1: false, spot2: false, spot3: false, spot4: false, is_rewarded: false };
     let pendingPhone = '';
 
@@ -102,10 +153,19 @@
         }
 
         // 스팟 방문 처리
+        let isNewSpot = false;
         if (currentSpot >= 1 && currentSpot <= 4 && !tourState.is_rewarded) {
             const spotKey = `spot${currentSpot}`;
             if (!tourState[spotKey]) {
+                if (currentSpot === 1) {
+                    // 스팟 1: 퀴즈 먼저, 스탬프는 정답 후 기록
+                    pendingSpot = currentSpot;
+                    renderUI();
+                    showQuizOverlay();
+                    return;
+                }
                 tourState[spotKey] = true;
+                isNewSpot = true;
                 await db
                     .from('sessions')
                     .update({ [spotKey]: true })
@@ -114,6 +174,10 @@
         }
 
         renderUI();
+
+        if (isNewSpot) {
+            showSpotOverlay(currentSpot);
+        }
     }
 
     // UI 렌더링
@@ -154,6 +218,94 @@
         } else {
             rewardBtn.style.display = 'none';
         }
+    }
+
+    // 스팟 환영 패널 표시
+    function showSpotOverlay(spotNum) {
+        const info = SPOT_INFO[spotNum];
+        document.getElementById('spot-overlay-emoji').textContent = info.emoji;
+        document.getElementById('spot-overlay-name').textContent = info.name;
+        document.getElementById('spot-overlay-title').textContent = info.title;
+        document.getElementById('spot-overlay-desc').textContent = info.desc;
+
+        const missionBox = document.getElementById('spot-mission-box');
+        if (info.missionText) {
+            document.getElementById('spot-mission-text').textContent = info.missionText;
+            missionBox.style.display = 'block';
+        } else {
+            missionBox.style.display = 'none';
+        }
+
+        document.getElementById('spot-overlay').style.display = 'flex';
+    }
+
+    function closeSpotOverlay() {
+        document.getElementById('spot-overlay').style.display = 'none';
+    }
+
+    // 퀴즈 표시
+    function showQuizOverlay() {
+        const answers = [
+            { text: '진안꽃잔디동산', correct: true },
+            { text: '진안 마이산', correct: false },
+            { text: '무주 구천동', correct: false },
+            { text: '남원 광한루', correct: false },
+        ];
+        answers.sort(() => Math.random() - 0.5);
+
+        const optionsEl = document.getElementById('quiz-options');
+        optionsEl.innerHTML = '';
+        const nums = ['①', '②', '③', '④'];
+        answers.forEach((ans, idx) => {
+            const btn = document.createElement('button');
+            btn.textContent = `${nums[idx]} ${ans.text}`;
+            btn.onclick = () => checkAnswer(ans.correct, btn);
+            optionsEl.appendChild(btn);
+        });
+
+        document.getElementById('quiz-feedback').textContent = '';
+        document.getElementById('quiz-overlay').style.display = 'flex';
+    }
+
+    async function checkAnswer(isCorrect, btn) {
+        const feedbackEl = document.getElementById('quiz-feedback');
+        const allBtns = document.querySelectorAll('#quiz-options button');
+        allBtns.forEach(b => b.onclick = null); // 중복 클릭 방지
+
+        if (!isCorrect) {
+            btn.classList.add('wrong');
+            feedbackEl.style.color = '#ff6b6b';
+            feedbackEl.textContent = '틀렸습니다. 다시 도전해보세요!';
+            setTimeout(() => {
+                btn.classList.remove('wrong');
+                feedbackEl.textContent = '';
+                allBtns.forEach((b, i) => {
+                    b.onclick = () => checkAnswer(
+                        document.querySelectorAll('#quiz-options button')[i] === b
+                            ? b.__correct : false, b
+                    );
+                });
+                // 버튼 onclick 재등록
+                showQuizOverlay();
+                document.getElementById('quiz-overlay').style.display = 'flex';
+            }, 900);
+            return;
+        }
+
+        // 정답
+        btn.classList.add('correct');
+        feedbackEl.style.color = '#2f9e44';
+        feedbackEl.textContent = '정답입니다! 🎉 스탬프가 찍혔습니다.';
+
+        tourState[`spot${pendingSpot}`] = true;
+        await db.from('sessions').update({ [`spot${pendingSpot}`]: true }).eq('id', sessionId);
+
+        setTimeout(() => {
+            document.getElementById('quiz-overlay').style.display = 'none';
+            renderUI();
+            showSpotOverlay(pendingSpot);
+            pendingSpot = 0;
+        }, 1200);
     }
 
     // 리워드 수령 — 전화번호 입력창 열기
