@@ -358,7 +358,12 @@
 
     // 직원이 사용 완료 처리
     async function completeReward() {
-        if (!confirm('직원 전용 버튼입니다. 사용 완료 처리하시겠습니까?')) return;
+        const pw = prompt('직원 전용 버튼입니다.\n암호를 입력해주세요:');
+        if (pw === null) return;
+        if (pw !== '효산재') {
+            alert('암호가 올바르지 않습니다.');
+            return;
+        }
 
         document.getElementById('reward-overlay').classList.add('loading');
 
