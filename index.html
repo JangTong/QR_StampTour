@@ -11,12 +11,13 @@
         p.subtitle { font-size: 14px; color: #666; margin-bottom: 30px; }
         .visual-area { font-size: 80px; margin: 20px 0; min-height: 120px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
         .status-text { font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #d6336c; }
-        .spot-list { list-style: none; padding: 0; margin: 0 0 30px 0; text-align: left; }
+        .spot-list { list-style: none; padding: 0; margin: 0 0 20px 0; text-align: left; }
         .spot-item { padding: 12px 16px; margin-bottom: 8px; border-radius: 8px; background-color: #f1f3f5; color: #adb5bd; font-weight: bold; display: flex; justify-content: space-between; }
         .spot-item.active { background-color: #ffe3e3; color: #d6336c; }
         .btn { display: block; width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 10px; box-sizing: border-box; }
         .btn-reward { background-color: #d6336c; color: white; display: none; }
         .btn-reset { background-color: #e9ecef; color: #495057; }
+        .btn-scan { background-color: #d6336c; color: white; font-size: 17px; padding: 16px; margin-bottom: 12px; }
         .reward-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; box-sizing: border-box; }
         .reward-overlay h2 { color: #ff8787; margin-bottom: 20px; }
         .phone-input { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #d6336c; margin: 10px 0; box-sizing: border-box; text-align: center; }
@@ -39,6 +40,13 @@
         .quiz-options button.wrong { border-color: #ff6b6b; background: #fff5f5; color: #ff6b6b; }
         .quiz-options button.correct { border-color: #51cf66; background: #f0fff4; color: #2f9e44; }
         .notice { font-size: 12px; color: #adb5bd; line-height: 1.6; margin-top: 20px; padding-top: 16px; border-top: 1px solid #f1f3f5; text-align: left; }
+        /* QR 스캐너 오버레이 */
+        .scanner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
+        .scanner-overlay .scanner-title { color: white; font-size: 18px; font-weight: bold; margin-bottom: 20px; }
+        .scanner-overlay .scanner-hint { color: #ccc; font-size: 13px; margin-top: 16px; }
+        .scanner-overlay .btn-cancel { margin-top: 24px; padding: 12px 40px; background: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: #333; }
+        #qr-reader { width: 280px; border-radius: 12px; overflow: hidden; }
+        #qr-reader video { border-radius: 12px; }
     </style>
 </head>
 <body>
@@ -59,7 +67,16 @@
         <li class="spot-item" id="ui-spot4"><span>📍 카페 효산재 : 마지막 동산의 작은 쉼터</span><span class="check"></span></li>
     </ul>
 
+    <button class="btn btn-scan" onclick="startScanner()">📷 QR 스캔하기</button>
     <button class="btn btn-reward" id="btn-reward" onclick="showRewardForm()">🎁 리워드 수령하기</button>
+</div>
+
+<!-- QR 스캐너 오버레이 -->
+<div class="scanner-overlay" id="scanner-overlay">
+    <div class="scanner-title">QR 코드를 화면에 맞춰주세요</div>
+    <div id="qr-reader"></div>
+    <div class="scanner-hint">스팟의 QR 코드를 스캔하면 스탬프가 찍힙니다</div>
+    <button class="btn-cancel" onclick="stopScanner()">취소</button>
 </div>
 
 <!-- 스팟 방문 환영 오버레이 -->
@@ -111,6 +128,8 @@
 
 <!-- Supabase 클라이언트 라이브러리 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- QR 스캐너 라이브러리 -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script>
     const SUPABASE_URL = 'https://bzlbnxeckajknojuqhhn.supabase.co';
@@ -134,9 +153,9 @@
     };
 
     let pendingSpot = 0;
-
     let tourState = { spot1: false, spot2: false, spot3: false, spot4: false, is_rewarded: false };
     let pendingPhone = '';
+    let qrScanner = null;
 
     // 앱 초기화
     async function init() {
@@ -158,32 +177,35 @@
             await db.from('sessions').insert({ id: sessionId });
         }
 
-        // 스팟 방문 처리
-        let isNewSpot = false;
-        if (currentSpot >= 1 && currentSpot <= 4 && !tourState.is_rewarded) {
-            const spotKey = `spot${currentSpot}`;
-            if (!tourState[spotKey]) {
-                if (currentSpot === 1) {
-                    // 스팟 1: 퀴즈 먼저, 스탬프는 정답 후 기록
-                    pendingSpot = currentSpot;
-                    renderUI();
-                    showQuizOverlay();
-                    return;
-                }
-                tourState[spotKey] = true;
-                isNewSpot = true;
-                await db
-                    .from('sessions')
-                    .update({ [spotKey]: true })
-                    .eq('id', sessionId);
-            }
-        }
-
         renderUI();
 
-        if (isNewSpot) {
-            showSpotOverlay(currentSpot);
+        if (currentSpot >= 1 && currentSpot <= 4) {
+            await processSpot(currentSpot);
         }
+    }
+
+    // 스팟 방문 처리 (URL 파라미터 & QR 스캔 공용)
+    async function processSpot(spotNum) {
+        if (tourState.is_rewarded) return;
+
+        const spotKey = `spot${spotNum}`;
+        if (tourState[spotKey]) {
+            // 이미 방문한 스팟 — 패널만 다시 보여줌
+            showSpotOverlay(spotNum);
+            return;
+        }
+
+        if (spotNum === 1) {
+            // 스팟 1: 퀴즈 먼저, 스탬프는 정답 후 기록
+            pendingSpot = spotNum;
+            showQuizOverlay();
+            return;
+        }
+
+        tourState[spotKey] = true;
+        await db.from('sessions').update({ [spotKey]: true }).eq('id', sessionId);
+        renderUI();
+        showSpotOverlay(spotNum);
     }
 
     // UI 렌더링
@@ -224,6 +246,43 @@
         } else {
             rewardBtn.style.display = 'none';
         }
+    }
+
+    // QR 스캐너 시작
+    function startScanner() {
+        document.getElementById('scanner-overlay').style.display = 'flex';
+        qrScanner = new Html5Qrcode('qr-reader');
+        qrScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 240, height: 240 } },
+            async (decodedText) => {
+                await stopScanner();
+                try {
+                    const url = new URL(decodedText);
+                    const spot = parseInt(url.searchParams.get('spot'));
+                    if (spot >= 1 && spot <= 4) {
+                        await processSpot(spot);
+                    } else {
+                        alert('올바른 스팟 QR 코드가 아닙니다.');
+                    }
+                } catch (e) {
+                    alert('올바른 QR 코드가 아닙니다.');
+                }
+            },
+            () => {} // 프레임 인식 오류는 무시
+        ).catch(() => {
+            alert('카메라 접근이 거부되었습니다.\n브라우저 설정에서 카메라 권한을 허용해주세요.');
+            document.getElementById('scanner-overlay').style.display = 'none';
+        });
+    }
+
+    // QR 스캐너 종료
+    async function stopScanner() {
+        if (qrScanner) {
+            await qrScanner.stop();
+            qrScanner = null;
+        }
+        document.getElementById('scanner-overlay').style.display = 'none';
     }
 
     // 스팟 환영 패널 표시
@@ -284,17 +343,7 @@
             feedbackEl.style.color = '#ff6b6b';
             feedbackEl.textContent = '틀렸습니다. 다시 도전해보세요!';
             setTimeout(() => {
-                btn.classList.remove('wrong');
-                feedbackEl.textContent = '';
-                allBtns.forEach((b, i) => {
-                    b.onclick = () => checkAnswer(
-                        document.querySelectorAll('#quiz-options button')[i] === b
-                            ? b.__correct : false, b
-                    );
-                });
-                // 버튼 onclick 재등록
                 showQuizOverlay();
-                document.getElementById('quiz-overlay').style.display = 'flex';
             }, 900);
             return;
         }
