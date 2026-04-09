@@ -32,6 +32,7 @@
         .mission-box { background: #fff5f7; border: 1.5px solid #fcc2d7; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; text-align: left; }
         .mission-label { font-size: 12px; font-weight: bold; color: #d6336c; margin-bottom: 6px; }
         .mission-text { font-size: 14px; color: #444; line-height: 1.75; white-space: pre-line; }
+        .btn-camera { display: block; width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 10px; background-color: #d6336c; color: white; font-size: 15px; font-weight: bold; cursor: pointer; }
         .quiz-question { font-size: 16px; font-weight: bold; color: #222; margin: 12px 0 14px; }
         .quiz-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
         .quiz-options button { padding: 12px 14px; border: 2px solid #f1f3f5; border-radius: 10px; background: white; font-size: 14px; font-weight: bold; cursor: pointer; color: #333; text-align: left; transition: all 0.2s; }
@@ -71,6 +72,8 @@
         <div class="mission-box" id="spot-mission-box" style="display:none;">
             <div class="mission-label">🎯 미션</div>
             <div class="mission-text" id="spot-mission-text"></div>
+            <button class="btn-camera" id="btn-camera" style="display:none;" onclick="document.getElementById('camera-input').click()">📷 카메라 열기</button>
+            <input type="file" accept="image/*" capture="environment" id="camera-input" style="display:none;">
         </div>
         <button class="btn-close" onclick="closeSpotOverlay()">확인</button>
     </div>
@@ -124,10 +127,10 @@
     }
 
     const SPOT_INFO = {
-        1: { emoji: '🏔️', name: '동산정상', title: '첫번째 꽃잔디정', desc: '꽃잔디동산에서 제일 높은 곳에 오셨습니다. 마이산과 그 산세를 관망할 수 있습니다.', missionText: null },
-        2: { emoji: '🌸', name: '꽃잔디 고원길', title: '두번째 분홍빛 속삭임', desc: '꽃향기만 남는 곳, 꽃잔디고원길 입니다.', missionText: '분홍빛 드레스코드로 꽃잔디 앞에서 특별한 포즈를 취하고 사진을 찍어주세요! 📸\n직원이 확인 후 스탬프를 인정해드립니다.' },
-        3: { emoji: '🌬️', name: '바람전망대', title: '세번째 바람도 쉬는 곳', desc: '바람이 전하는 안부, \'오늘 여기 오길 잘했지?\'', missionText: '잠깐 멈춰, 꽃동산의 바람을 깊게 들이마셔 보세요. 🌬️\n눈을 감고 자연의 향기를 느껴보세요.' },
-        4: { emoji: '☕', name: '카페 효산재', title: '마지막 동산의 작은 쉼터', desc: '기분좋은 마침표, 우리들의 이야기로 채워가는 작은 카페입니다.', missionText: null },
+        1: { emoji: '🏔️', name: '동산정상', title: '첫번째 꽃잔디정', desc: '꽃잔디동산에서 제일 높은 곳에 오셨습니다. 마이산과 그 산세를 관망할 수 있습니다.', missionText: null, showCamera: false },
+        2: { emoji: '🌸', name: '꽃잔디 고원길', title: '두번째 분홍빛 속삭임', desc: '꽃향기만 남는 곳, 꽃잔디고원길 입니다.', missionText: '분홍빛 드레스코드로 꽃잔디 앞에서 특별한 포즈를 취하고 사진을 찍어주세요! 📸\n직원이 확인 후 스탬프를 인정해드립니다.', showCamera: true },
+        3: { emoji: '🌬️', name: '바람전망대', title: '세번째 바람도 쉬는 곳', desc: '바람이 전하는 안부, \'오늘 여기 오길 잘했지?\'', missionText: '잠깐 멈춰, 꽃동산의 바람을 깊게 들이마셔 보세요. 🌬️\n눈을 감고 자연의 향기를 느껴보세요.', showCamera: false },
+        4: { emoji: '☕', name: '카페 효산재', title: '마지막 동산의 작은 쉼터', desc: '기분좋은 마침표, 우리들의 이야기로 채워가는 작은 카페입니다.', missionText: null, showCamera: false },
     };
 
     let pendingSpot = 0;
@@ -234,6 +237,7 @@
         const missionBox = document.getElementById('spot-mission-box');
         if (info.missionText) {
             document.getElementById('spot-mission-text').textContent = info.missionText;
+            document.getElementById('btn-camera').style.display = info.showCamera ? 'block' : 'none';
             missionBox.style.display = 'block';
         } else {
             missionBox.style.display = 'none';
